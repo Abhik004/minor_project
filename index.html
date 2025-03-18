@@ -209,8 +209,8 @@
     <h1>SURVIVOR SPRINT 🎮</h1>
     <h2>Avoid Obstacles or Make Your Opponent Hit Them!</h2>
     <div style="margin-top: 20px; color: #475569; font-size: 1.2rem;">
-      <p><strong>Player 1 (Blue):</strong> A/D to move</p>
-      <p><strong>Player 2 (Red):</strong> ←/→ to move</p>
+      <p><strong>Player 1 (Blue):</strong> A/D to move, W to jump</p>
+      <p><strong>Player 2 (Red):</strong> ←/→ to move, ↑ to jump</p>
     </div>
     <h2 style="margin-top: 30px;">Press Any Key to Start</h2>
   </div>
@@ -222,13 +222,13 @@
 
   <div class="ui-container">
     <div id="score">Survivor Time: 0</div>
-    <div class="player-info" id="player1-info">Player 1 (Blue): A/D</div>
-    <div class="player-info" id="player2-info">Player 2 (Red): ←/→</div>
+    <div class="player-info" id="player1-info">Player 1 (Blue): A/D, W to jump</div>
+    <div class="player-info" id="player2-info">Player 2 (Red): ←/→, ↑ to jump</div>
   </div>
 
   <div id="controls">
-    <div><span style="color: #4a90e2; font-weight: bold;">Player 1:</span> <span class="key">A</span><span class="key">D</span></div>
-    <div><span style="color: #ff6b6b; font-weight: bold;">Player 2:</span> <span class="key">←</span><span class="key">→</span></div>
+    <div><span style="color: #4a90e2; font-weight: bold;">Player 1:</span> <span class="key">A</span><span class="key">D</span><span class="key">W</span></div>
+    <div><span style="color: #ff6b6b; font-weight: bold;">Player 2:</span> <span class="key">←</span><span class="key">→</span><span class="key">↑</span></div>
   </div>
 
   <div id="audio-controls">
@@ -277,7 +277,9 @@
     const countdownSound = new Audio('countdown.mp3');
     countdownSound.volume = 0.7;
     
-    
+    // Jump sound
+    const jumpSound = new Audio('jump.mp3');
+    jumpSound.volume = 0.5;
 
     // Audio controls
     document.getElementById('audio-toggle').addEventListener('click', () => {
@@ -290,7 +292,7 @@
         backgroundMusic.pause();
         gameOverSound.pause();
         countdownSound.pause();
-        
+        jumpSound.pause();
       }
     });
 
@@ -348,6 +350,12 @@
         this.velocity = velocity;
         this.gravity = -0.002;
         this.zAcceleration = zAcceleration;
+        
+        // Jump properties
+        this.isJumping = false;
+        this.jumpForce = 0.09;
+        this.jumpCooldown = 0; // Cooldown timer to prevent continuous jumping
+        this.onGround = false; // Track if the player is on the ground
       }
 
       updateSides() {
@@ -358,6 +366,25 @@
         this.front = this.position.z + this.depth / 2;
         this.back = this.position.z - this.depth / 2;
       }
+      
+      jump() {
+        // Only allow jumping if not already jumping and cooldown is over
+        if (!this.isJumping && this.onGround && this.jumpCooldown <= 0) {
+          this.velocity.y = this.jumpForce;
+          this.isJumping = true;
+          this.onGround = false;
+          this.jumpCooldown = 20; // Set cooldown frames
+          
+          // Play jump sound
+          if (isSoundOn) {
+            const jumpSoundClone = jumpSound.cloneNode();
+            jumpSoundClone.play();
+          }
+          
+          return true;
+        }
+        return false;
+      }
 
       update(ground) {
         this.updateSides();
@@ -367,6 +394,11 @@
         this.position.x += this.velocity.x;
         this.position.z += this.velocity.z;
         this.position.y += this.velocity.y;
+
+        // Update jump cooldown
+        if (this.jumpCooldown > 0) {
+          this.jumpCooldown--;
+        }
 
         this.applyGravity(ground);
         
@@ -388,6 +420,12 @@
           const friction = 0.5;
           this.velocity.y *= friction;
           this.velocity.y = -this.velocity.y;
+          
+          // Reset jumping state when touching ground
+          this.isJumping = false;
+          this.onGround = true;
+        } else {
+          this.onGround = false;
         }
       }
     }
@@ -498,15 +536,17 @@
     const ambientLight = new THREE.AmbientLight(0xf8fafc, 0.6);
     scene.add(ambientLight);
 
-    // Controls for both players (removed jump keys)
+    // Controls for both players (adding jump keys)
     const keys = {
-      // Player 1 controls (AD)
+      // Player 1 controls (AD + W for jump)
       a: { pressed: false },
       d: { pressed: false },
+      w: { pressed: false }, // Jump key for Player 1
       
       // Player 2 controls (Arrow keys)
       ArrowLeft: { pressed: false },
-      ArrowRight: { pressed: false }
+      ArrowRight: { pressed: false },
+      ArrowUp: { pressed: false } // Jump key for Player 2
     };
 
     // Function to start the countdown
@@ -528,7 +568,6 @@
           if (isSoundOn) countdownSound.play();
         } else if (countdownValue === 0) {
           document.getElementById('countdown').textContent = 'GO!';
-          if (isSoundOn) goSound.play();
         } else {
           clearInterval(countdownInterval);
           document.getElementById('countdown-overlay').style.display = 'none';
@@ -569,6 +608,13 @@
         case 'd':
           keys.d.pressed = true;
           break;
+        case 'w':
+          keys.w.pressed = true;
+          // Handle jumping for player 1
+          if (!isGameOver && !isCountingDown) {
+            player1.jump();
+          }
+          break;
           
         // Player 2 controls
         case 'ArrowLeft':
@@ -576,6 +622,13 @@
           break;
         case 'ArrowRight':
           keys.ArrowRight.pressed = true;
+          break;
+        case 'ArrowUp':
+          keys.ArrowUp.pressed = true;
+          // Handle jumping for player 2
+          if (!isGameOver && !isCountingDown) {
+            player2.jump();
+          }
           break;
           
         // Restart game
@@ -596,6 +649,9 @@
         case 'd':
           keys.d.pressed = false;
           break;
+        case 'w':
+          keys.w.pressed = false;
+          break;
           
         // Player 2 controls
         case 'ArrowLeft':
@@ -603,6 +659,9 @@
           break;
         case 'ArrowRight':
           keys.ArrowRight.pressed = false;
+          break;
+        case 'ArrowUp':
+          keys.ArrowUp.pressed = false;
           break;
       }
     });
@@ -622,11 +681,15 @@
       player1.velocity.x = 0;
       player1.velocity.y = -0.01;
       player1.velocity.z = 0;
+      player1.isJumping = false;
+      player1.jumpCooldown = 0;
       
       player2.position.set(2, 0, 0);
       player2.velocity.x = 0;
       player2.velocity.y = -0.01;
       player2.velocity.z = 0;
+      player2.isJumping = false;
+      player2.jumpCooldown = 0;
       
       // Remove all enemies
       for (let enemy of enemies) {
@@ -660,24 +723,24 @@
       if (keys.ArrowLeft.pressed) player2.velocity.x = -0.05;
       else if (keys.ArrowRight.pressed) player2.velocity.x = 0.05;
 
-      
+      // Update camera to show both players
       const centerX = (player1.position.x + player2.position.x) / 2;
       const distance = Math.abs(player1.position.x - player2.position.x);
       
-  
+      // Adjust camera position based on players' distance
       camera.position.x = centerX;
-      camera.position.z = 8 + distance * 0.5; 
+      camera.position.z = 8 + distance * 0.5; // Move camera back as players spread apart
       camera.lookAt(centerX, 0, -5);
       
-      
+      // Check for player-to-player collisions
       if (sphereCollision(player1, player2)) {
         handlePlayerCollision();
       }
 
-
+      // Check for players falling off
       if (player1.update(ground)) {
         cancelAnimationFrame(animationId);
-        endGame("player2"); 
+        endGame("player2"); // Player 2 wins if Player 1 falls
         return;
       }
       
@@ -687,6 +750,7 @@
         return;
       }
       
+      // Update enemy positions and check collisions
       for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
         enemy.update(ground);
@@ -701,7 +765,7 @@
         // Check collision with player 2
         if (boxCollision({ box1: player2, box2: enemy })) {
           cancelAnimationFrame(animationId);
-          endGame("player1"); 
+          endGame("player1"); // Player 1 wins if Player 2 hits obstacle
           return;
         }
         
@@ -712,7 +776,7 @@
         }
       }
 
-    
+      // Spawn new enemies
       if (frames % spawnRate === 0) {
         if (spawnRate > 20) spawnRate -= 5;
 
@@ -720,7 +784,7 @@
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
         const speed = 0.005 + (survivalTime / 100);
 
-      
+        // Random position across the width of the track
         const xPosition = (Math.random() - 0.5) * 10;
         
         const enemy = new GameObject({
