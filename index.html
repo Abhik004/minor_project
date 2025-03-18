@@ -9,6 +9,38 @@
       margin: 0;
       background: #f8fafc;
       font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    .ui-container {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 1.5rem 2.5rem;
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(148, 163, 184, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    #score {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #0f172a;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 1.5rem 2rem;
+      border-radius: 20px;
+      color: #475569;
+      box-shadow: 0 4px 15px rgba(148, 163, 184, 0.15);
+      backdrop-filter: blur(8px);
     }
 
     #game-over {
@@ -35,6 +67,12 @@
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 
+    #game-over .final-score {
+      font-size: 2.25rem;
+      margin: 1.5rem 0;
+      color: #475569;
+    }
+
     #game-over .restart-text {
       font-size: 1.5rem;
       margin-top: 1.5rem;
@@ -53,6 +91,12 @@
       color: #0f172a;
       font-weight: 600;
       box-shadow: 0 2px 4px rgba(148, 163, 184, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .key:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(148, 163, 184, 0.15);
     }
 
     #audio-controls {
@@ -85,11 +129,69 @@
       transform: translateY(-1px);
       box-shadow: 0 4px 6px rgba(148, 163, 184, 0.15);
     }
+
+    #start-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.98);
+      display: flex;
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      z-index: 2000;
+      backdrop-filter: blur(8px);
+    }
+
+    #start-overlay h1 {
+      font-size: 3rem;
+      color: #0f172a;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin: 0;
+    }
+
+    #start-overlay h2 {
+      font-size: 1.5rem;
+      color: #475569;
+      margin: 10px 0 0 0;
+    }
+
+    #countdown {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 6rem;
+      font-weight: bold;
+      color: #0f172a;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      z-index: 1500;
+      display: none;
+    }
   </style>
 </head>
 <body>
+  <div id="start-overlay">
+    <h1>SURVIVOR SPRINT 🎮</h1>
+    <h2>Press Any Key to Start</h2>
+  </div>
+
+  <div id="countdown">3</div>
+
+  <div class="ui-container">
+    <div id="score">Score - 0</div>
+  </div>
+
+  <div id="controls">
+    <div>Move: <span class="key">A</span>(Left) <span class="key">D</span>(Right)</div>
+    <div>Jump: <span class="key">SPACE</span></div>
+  </div>
+
   <div id="game-over">
     <h1>GAME OVER</h1>
+    <div class="final-score">Score - <span id="final-score">0</span></div>
     <div class="restart-text">Press <span class="key">R</span> to restart</div>
   </div>
 
@@ -135,6 +237,11 @@
     let isGameOver = false;
     let isSoundOn = true;
     const JUMP_HEIGHT = 0.08;
+    let score = 0;
+    let frames = 0;
+    let spawnRate = 200;
+    let gameStarted = false;
+    let countdownActive = false;
 
     // Audio elements
     const backgroundMusic = new Audio('abc.mp3');
@@ -153,7 +260,7 @@
       document.getElementById('audio-toggle').textContent = isSoundOn ? '🔊 Sound: ON' : '🔇 Sound: OFF';
 
       if (isSoundOn) {
-        if (!isGameOver) backgroundMusic.play();
+        if (!isGameOver && gameStarted) backgroundMusic.play();
       } else {
         backgroundMusic.pause();
         gameOverSound.pause();
@@ -276,8 +383,8 @@
     function endGame() {
       isGameOver = true;
       document.getElementById('game-over').style.display = 'block';
+      document.getElementById('final-score').textContent = score;
 
-      // Play game over sound
       if (isSoundOn) {
         backgroundMusic.pause();
         backgroundMusic.currentTime = 0;
@@ -338,6 +445,13 @@
     };
 
     window.addEventListener('keydown', (event) => {
+      if (!gameStarted) {
+        startGame();
+        return;
+      }
+
+      if (countdownActive) return;
+
       switch (event.code) {
         case 'KeyA':
           keys.a.pressed = true;
@@ -376,15 +490,49 @@
 
     const enemies = [];
 
-    let frames = 0;
-    let spawnRate = 200;
+    function startGame() {
+      document.getElementById('start-overlay').style.display = 'none';
+      gameStarted = true;
+      countdownActive = true;
+      
+      const countdownEl = document.getElementById('countdown');
+      countdownEl.style.display = 'block';
+      countdownEl.textContent = '3';
+      
+      setTimeout(() => {
+        countdownEl.textContent = '2';
+        setTimeout(() => {
+          countdownEl.textContent = '1';
+          setTimeout(() => {
+            countdownEl.textContent = 'GO!';
+            setTimeout(() => {
+              countdownEl.style.display = 'none';
+              countdownActive = false;
+              
+              if (isSoundOn) {
+                backgroundMusic.play().catch(error => {
+                  console.log("Audio couldn't autoplay. User interaction needed.");
+                  document.addEventListener('click', () => {
+                    if (!isGameOver && isSoundOn) backgroundMusic.play();
+                  }, { once: true });
+                });
+              }
+              
+              animate();
+            }, 1000);
+          }, 1000);
+        }, 1000);
+      }, 1000);
+    }
 
     function restartGame() {
       isGameOver = false;
       frames = 0;
       spawnRate = 200;
+      score = 0;
 
       document.getElementById('game-over').style.display = 'none';
+      document.getElementById('score').textContent = 'Score - 0';
 
       cube.position.set(0, 0, 0);
       cube.velocity.x = 0;
@@ -396,8 +544,8 @@
       }
       enemies.length = 0;
 
-      // Play background music
       if (isSoundOn) {
+        backgroundMusic.currentTime = 0;
         backgroundMusic.play().catch(error => {
           console.log("Audio couldn't autoplay. User interaction needed.");
           document.addEventListener('click', () => {
@@ -409,21 +557,18 @@
       animate();
     }
 
-    // Play background music when game starts
-    if (isSoundOn) {
-      backgroundMusic.play().catch(error => {
-        console.log("Audio couldn't autoplay. User interaction needed.");
-        document.addEventListener('click', () => {
-          if (!isGameOver && isSoundOn) backgroundMusic.play();
-        }, { once: true });
-      });
-    }
+    renderer.render(scene, camera);
 
     function animate() {
       const animationId = requestAnimationFrame(animate);
       renderer.render(scene, camera);
 
       if (isGameOver) return;
+
+      if (frames % 3 === 0) {
+        score += 1;
+        document.getElementById('score').textContent = `Score - ${score}`;
+      }
 
       cube.velocity.x = 0;
       if (keys.a.pressed) cube.velocity.x = -0.05;
@@ -477,7 +622,13 @@
 
       frames++;
     }
-    animate();
+    
+    // Handle click for audio autoplay
+    document.addEventListener('click', () => {
+      if (!gameStarted) {
+        startGame();
+      }
+    });
   </script>
 </body>
 </html>
