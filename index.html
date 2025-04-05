@@ -260,6 +260,7 @@
     let frames = 0;
     let spawnRate = 150;
     let survivalTime = 0;
+    let speedTime = 0;
     const enemies = [];
     let winner = null;
     let isSoundOn = true;
@@ -671,6 +672,7 @@
       frames = 0;
       spawnRate = 150;
       survivalTime = 0;
+      speedTime=0;
       winner = null;
       
       document.getElementById('game-over').style.display = 'none';
@@ -709,7 +711,8 @@
 
       // Update survival time (in seconds)
       if (frames % 60 === 0) {
-        survivalTime += 0.1;
+        survivalTime += 1;
+        speedTime+=0.1;
         document.getElementById('score').textContent = `Survivor Time: ${survivalTime.toFixed(1)}`;
       }
 
@@ -782,7 +785,7 @@
 
         const colors = ['#9c59b6', '#2ecc71', '#f39c12', '#1abc9c', '#e74c3c'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        const speed = 0.005 + (survivalTime / 100);
+        const speed = 0.005 + (speedTime / 100);
 
         // Random position across the width of the track
         const xPosition = (Math.random() - 0.5) * 10;
